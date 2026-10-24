@@ -1,0 +1,42 @@
+[*]
+[*] GTKWave Analyzer
+[*]
+[dumpfile] "riscv_top.vcd"
+[savefile] "riscv_top.gtkw"
+[timestart] 0
+[size] 1400 900
+[pos] -1 -1
+[sst_width] 260
+[signals_width] 220
+[sst_expanded] 1
+@28
+riscv_top_tb.clk
+riscv_top_tb.reset
+-
+@22
+riscv_top_tb.dut.pc_curr[31:0]
+riscv_top_tb.dut.inst[31:0]
+riscv_top_tb.dut.imm_out[31:0]
+-
+riscv_top_tb.dut.alu_op_type[1:0]
+riscv_top_tb.dut.alu_ctrl[3:0]
+riscv_top_tb.dut.alu_operand_a[31:0]
+riscv_top_tb.dut.alu_operand_b[31:0]
+riscv_top_tb.dut.alu_result[31:0]
+@28
+riscv_top_tb.dut.alu_zero
+riscv_top_tb.dut.alu_lt
+riscv_top_tb.dut.alu_ltu
+riscv_top_tb.dut.branch
+riscv_top_tb.dut.take_branch
+riscv_top_tb.dut.pc_src
+@22
+riscv_top_tb.dut.pc_next[31:0]
+-
+@28
+riscv_top_tb.dut.reg_write
+riscv_top_tb.dut.u_reg_file.wen
+@22
+riscv_top_tb.dut.u_reg_file.waddr[4:0]
+riscv_top_tb.dut.u_reg_file.wdata[31:0]
+riscv_top_tb.dut.writeback_data[31:0]

@@ -14,60 +14,44 @@ The processor follows a classic **single-cycle CPU architecture**, where each in
 
 **CPI = 1.0**
 
-```text
-                         ┌──────────────────┐
-                         │     PC + 4       │
-                         │      Adder       │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                            ┌───────────┐
-                            │    MUX    │◄──────────────┐
-                            │  PC Next  │               │
-                            └─────┬─────┘               │
-                                  │                     │
-                                  ▼                     │
-                         ┌─────────────────┐            │
-                         │  PC Register    │            │
-                         └────────┬────────┘            │
-                                  │                     │
-                                  ▼                     │
-                         ┌─────────────────┐            │
-                         │ Instruction     │            │
-                         │ Memory          │            │
-                         └────────┬────────┘            │
-                                  │                     │
-                                  ▼                     │
-                         ┌─────────────────┐
-                         │  Control Unit   │
-                         └────────┬────────┘
-                                  │
-                ┌─────────────────┼──────────────────┐
-                │                 │                  │
-                ▼                 ▼                  ▼
-        ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-        │ Register File│   │  Immediate   │   │ ALU Control  │
-        │   x0 - x31   │   │   Generator  │   │              │
-        └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-               │                  │                  │
-               └──────────────────┼──────────────────┘
-                                  ▼
-                            ┌─────────────┐
-                            │     ALU     │
-                            └──────┬──────┘
-                                   │
-                                   ▼
-                            ┌─────────────┐
-                            │ Data Memory │
-                            └──────┬──────┘
-                                   │
-                                   ▼
-                            ┌─────────────┐
-                            │ Writeback   │
-                            │    MUX      │
-                            └──────┬──────┘
-                                   │
-                                   └──────────► Register File
+```mermaid
+flowchart LR
+    PC["Program Counter<br/>PC"] --> IMEM["Instruction Memory<br/>program.hex"]
+    IMEM --> DEC["Instruction Decode"]
+    DEC --> CTRL["Main Control Unit"]
+    DEC --> IMM["Immediate Generator"]
+
+    DEC -->|rs1, rs2| RF["Register File<br/>x0-x31"]
+    CTRL -->|ALU operation type| ALUCTRL["ALU Control"]
+    DEC -->|funct3, funct7[5]| ALUCTRL
+
+    RF -->|read data 1| ASEL{"ALU input A"}
+    PC -->|AUIPC source| ASEL
+    CTRL -->|PC or rs1 select| ASEL
+    ASEL --> ALU["32-bit ALU"]
+    RF -->|read data 2| BSEL{"ALU input B"}
+    IMM --> BSEL
+    CTRL -->|register or immediate select| BSEL
+    BSEL --> ALU
+    ALUCTRL -->|operation| ALU
+
+    ALU -->|address| DMEM["Data Memory"]
+    RF -->|store data| DMEM
+    CTRL -->|read / write enables| DMEM
+    ALU --> WBSEL{"Writeback Select"}
+    DMEM --> WBSEL
+    PC4["PC + 4"] --> WBSEL
+    CTRL -->|writeback source| WBSEL
+    WBSEL -->|write result| RF
+
+    PC --> PC4
+    PC --> BTA["Branch Target<br/>PC + immediate"]
+    ALU -->|JALR target<br/>(result & ~1)| PCSEL{"Next-PC Select"}
+    BTA --> PCSEL
+    PC4 --> PCSEL
+    CTRL -->|branch / jump controls| PCSEL
+    ALU -->|zero / signed lt / unsigned ltu| PCSEL
+    PCSEL -->|next PC| PC
 ```
 
 ---
@@ -246,9 +230,9 @@ This allows load/store instructions to operate within the single-cycle datapath.
 | **I-Type** | `ADDI`, `SLTI`, `SLTIU`, `XORI`, `ORI`, `ANDI`, `SLLI`, `SRLI`, `SRAI` | Register-immediate operations |
 | **Load** | `LW` | Load word from memory |
 | **Store** | `SW` | Store word to memory |
-| **Branch** | `BEQ`, `BNE` | Conditional branching |
-| **Jump** | `JAL` | Jump and link |
-| **Upper Immediate** | `LUI` | Load upper immediate |
+| **Branch** | `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU` | Equality, signed, and unsigned conditional branches |
+| **Jump** | `JAL`, `JALR` | Direct and register-indirect jump-and-link |
+| **Upper Immediate** | `LUI`, `AUIPC` | Load upper immediate or add upper immediate to the PC |
 
 ---
 
@@ -274,7 +258,7 @@ risc-v/
 │   └── riscv_top_tb.sv
 │
 ├── program.hex
-├── Makefile
+├── riscv_top.gtkw
 └── README.md
 ```
 
@@ -285,7 +269,7 @@ risc-v/
 | `rtl/` | Processor RTL implementation |
 | `tb/` | Unit and integration testbenches |
 | `program.hex` | Machine-code program executed by the processor |
-| `Makefile` | Build and simulation automation |
+| `riscv_top.gtkw` | GTKWave layout with useful CPU signals preselected |
 | `README.md` | Project documentation |
 
 ---
@@ -307,95 +291,48 @@ and executes them directly through the processor.
 
 ---
 
-## Verification Program
+## Instruction-by-Instruction Program Walkthrough
 
-The test program performs the following sequence.
+The integration test executes the machine-code words in [`program.hex`](program.hex) from address `0x00`. This short program checks register setup, signed and unsigned branch decisions, `AUIPC`, and `JALR`.
 
-### 1. Load 10 into `x1`
+| PC | Machine code | Assembly | Format | What happens |
+|----|--------------|----------|--------|--------------|
+| `0x00` | `00000093` | `ADDI x1, x0, 0` | I | Initialize `x1 = 0`. |
+| `0x04` | `00100113` | `ADDI x2, x0, 1` | I | Initialize `x2 = 1`. |
+| `0x08` | `00200193` | `ADDI x3, x0, 2` | I | Initialize `x3 = 2`. |
+| `0x0C` | `0020C463` | `BLT x1, x2, 8` | B | Signed comparison `0 < 1` is true; branch to `0x14`, skipping the write to `x6`. |
+| `0x10` | `06300313` | `ADDI x6, x0, 99` | I | Deliberately skipped; `x6` must remain `0`. |
+| `0x14` | `0020D263` | `BGE x1, x2, 4` | B | Signed comparison `0 >= 1` is false; continue to `0x18`. |
+| `0x18` | `0020E463` | `BLTU x1, x2, 8` | B | Unsigned comparison `0 < 1` is true; branch to `0x20`, skipping the write to `x7`. |
+| `0x1C` | `06300393` | `ADDI x7, x0, 99` | I | Deliberately skipped; `x7` must remain `0`. |
+| `0x20` | `0020F263` | `BGEU x1, x2, 4` | B | Unsigned comparison `0 >= 1` is false; continue to `0x24`. |
+| `0x24` | `00000013` | `ADDI x0, x0, 0` (`NOP`) | I | No operation; writes to `x0` are ignored. |
+| `0x28` | `00000013` | `ADDI x0, x0, 0` (`NOP`) | I | No operation; advances to `0x2C`. |
+| `0x2C` | `00000013` | `ADDI x0, x0, 0` (`NOP`) | I | No operation; advances to `0x30`. |
+| `0x30` | `00001217` | `AUIPC x4, 1` | U | Set `x4 = PC + (1 << 12) = 0x30 + 0x1000 = 0x1030`. |
+| `0x34` | `000202E7` | `JALR x5, 0(x4)` | I | Jump to `x4 & ~1 = 0x1030`; save return address `0x38` in `x5`. |
 
-```text
-ADDI x1, x0, 10
-```
+### How the branch checks work
 
-Result:
+The two instructions that write `99` are intentional **poison instructions**: if either branch fails to take when expected, the corresponding register changes and the integration test fails.
 
-```text
-x1 = 10
-```
+- `BLT` and `BLTU` must take the branch and skip the write to `x6` or `x7`.
+- `BGE` and `BGEU` must not take the branch for the values `x1 = 0` and `x2 = 1`.
+- The testbench checks that both `x6` and `x7` remain zero.
 
-### 2. Load 20 into `x2`
+### Expected final state
 
-```text
-ADDI x2, x0, 20
-```
+After the test program runs, the integration test checks:
 
-Result:
-
-```text
-x2 = 20
-```
-
-### 3. Add `x1` and `x2`
-
-```text
-ADD x3, x1, x2
-```
-
-Result:
-
-```text
-x3 = 30
-```
-
-### 4. Store the result into memory
-
-```text
-SW x3, 4(x0)
-```
-
-Result:
-
-```text
-MEM[4] = 30
-```
-
-### 5. Load the value back
-
-```text
-LW x4, 4(x0)
-```
-
-Result:
-
-```text
-x4 = 30
-```
-
-### 6. Test conditional branching
-
-```text
-BEQ x3, x4, 8
-```
-
-Since:
-
-```text
-x3 == x4
-```
-
-the branch is taken.
-
-### 7. Execute the next instruction
-
-```text
-ADDI x5, x0, 42
-```
-
-Result:
-
-```text
-x5 = 42
-```
+| Register | Expected value | Reason |
+|----------|----------------|--------|
+| `x1` | `0x00000000` | Initial value for branch comparisons |
+| `x2` | `0x00000001` | Initial value for branch comparisons |
+| `x3` | `0x00000002` | Register setup instruction |
+| `x4` | `0x00001030` | `AUIPC` result used as the `JALR` target |
+| `x5` | `0x00000038` | Return address saved by `JALR` |
+| `x6` | `0x00000000` | Confirms the `BLT` skipped its poison instruction |
+| `x7` | `0x00000000` | Confirms the `BLTU` skipped its poison instruction |
 
 ---
 
@@ -425,7 +362,7 @@ VS Code
 Run:
 
 ```bash
-verilator --binary -j 0 -Wall \
+verilator --binary --trace -j 0 -Wall \
   -Wno-DECLFILENAME \
   -Wno-IMPORTSTAR \
   -Wno-UNUSEDSIGNAL \
@@ -470,6 +407,24 @@ Run:
 
 ```bash
 vvp sim_cpu
+```
+
+## View the waveform in GTKWave
+
+The integration testbench writes signal activity to `riscv_top.vcd`. Run the simulation from the repository root, then open the waveform with the included signal layout:
+
+```bash
+gtkwave riscv_top.vcd riscv_top.gtkw
+```
+
+The layout preselects the clock and reset, PC and instruction, ALU inputs and result, branch decisions, and register writeback signals. The VCD is generated locally and is intentionally ignored by Git; rerun the simulation whenever you want a fresh trace.
+
+### GTKWave screenshot
+
+To add a screenshot, save it as `docs/images/riscv-top-waveform.png`, then insert it here:
+
+```markdown
+![RISC-V CPU waveform in GTKWave](docs/images/riscv-top-waveform.png)
 ```
 
 ---
@@ -607,15 +562,8 @@ Some of the key concepts implemented in this project include:
 
 # Future Work
 
-The current processor provides a functional single-cycle RV32I implementation. Planned improvements include:
+The current processor implements a tested subset of RV32I. Planned improvements include:
 
-- [ ] Add `JALR`
-- [ ] Add `AUIPC`
-- [ ] Add additional branch instructions:
-  - `BLT`
-  - `BGE`
-  - `BLTU`
-  - `BGEU`
 - [ ] Add byte and halfword loads:
   - `LB`
   - `LH`
@@ -628,7 +576,6 @@ The current processor provides a functional single-cycle RV32I implementation. P
 - [ ] Run the `riscv-arch-test` compliance suite
 - [ ] Improve memory subsystem
 - [ ] Add more comprehensive automated testbenches
-- [ ] Add waveform-based debugging
 - [ ] Convert the single-cycle processor into a **5-stage pipelined RV32I processor**
 - [ ] Implement pipeline registers
 - [ ] Add hazard detection

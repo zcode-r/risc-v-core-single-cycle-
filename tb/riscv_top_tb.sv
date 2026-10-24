@@ -21,6 +21,9 @@ module riscv_top_tb;
   int cycle_cnt;
 
   initial begin
+    $dumpfile("riscv_top.vcd");
+    $dumpvars(0, riscv_top_tb);
+
     clk       = 0;
     reset     = 1;
     cycle_cnt = 0;
