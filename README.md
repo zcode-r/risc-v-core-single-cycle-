@@ -421,11 +421,7 @@ The layout preselects the clock and reset, PC and instruction, ALU inputs and re
 
 ### GTKWave screenshot
 
-To add a screenshot, save it as `docs/images/riscv-top-waveform.png`, then insert it here:
-
-```markdown
-![RISC-V CPU waveform in GTKWave](docs/images/riscv-top-waveform.png)
-```
+<img width="694" height="475" alt="Screenshot 2026-10-23 212830" src="https://github.com/user-attachments/assets/cf797b43-4489-42b3-9988-4531c9ff42d7" />
 
 ---
 
