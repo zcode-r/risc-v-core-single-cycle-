@@ -12,49 +12,8 @@ The design has been verified using **Verilator** and **Icarus Verilog (`iverilog
 
 The processor follows a classic **single-cycle CPU architecture**, where each instruction is fetched, decoded, executed, and completed within a single clock cycle.
 
-**CPI = 1.0**
+<img width="2752" height="1536" alt="Gemini_Generated_Image_wizgzywizgzywizg" src="https://github.com/user-attachments/assets/e7f67567-7325-431e-aa10-75dce8e2364e" />
 
-```mermaid
-flowchart LR
-    PC["Program Counter<br/>PC"] --> IMEM["Instruction Memory<br/>program.hex"]
-    IMEM --> DEC["Instruction Decode"]
-    DEC --> CTRL["Main Control Unit"]
-    DEC --> IMM["Immediate Generator"]
-
-    DEC -->|rs1, rs2| RF["Register File<br/>x0-x31"]
-    CTRL -->|ALU operation type| ALUCTRL["ALU Control"]
-    DEC -->|funct3, funct7[5]| ALUCTRL
-
-    RF -->|read data 1| ASEL{"ALU input A"}
-    PC -->|AUIPC source| ASEL
-    CTRL -->|PC or rs1 select| ASEL
-    ASEL --> ALU["32-bit ALU"]
-    RF -->|read data 2| BSEL{"ALU input B"}
-    IMM --> BSEL
-    CTRL -->|register or immediate select| BSEL
-    BSEL --> ALU
-    ALUCTRL -->|operation| ALU
-
-    ALU -->|address| DMEM["Data Memory"]
-    RF -->|store data| DMEM
-    CTRL -->|read / write enables| DMEM
-    ALU --> WBSEL{"Writeback Select"}
-    DMEM --> WBSEL
-    PC4["PC + 4"] --> WBSEL
-    CTRL -->|writeback source| WBSEL
-    WBSEL -->|write result| RF
-
-    PC --> PC4
-    PC --> BTA["Branch Target<br/>PC + immediate"]
-    ALU -->|JALR target<br/>(result & ~1)| PCSEL{"Next-PC Select"}
-    BTA --> PCSEL
-    PC4 --> PCSEL
-    CTRL -->|branch / jump controls| PCSEL
-    ALU -->|zero / signed lt / unsigned ltu| PCSEL
-    PCSEL -->|next PC| PC
-```
-
----
 
 ## Key Features
 
